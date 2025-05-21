@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Doctor Dashboard</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" />
+  <script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
+    <link rel="stylesheet" href="/doctor-dashboard.css" />
+</head>
+<body>
+  <div class="dashboard">
+    <div class="header">
+      <h2>Welcome back, Dr. <%= currentUser.fullName %></h2>
+      <div class="qr-icon" onclick="openQR()">
+        <i class="fas fa-qrcode"></i>
+      </div>
+    </div>
+
+    <div class="search-box">
+      <input type="text" placeholder="Search patients...">
+      <i class="fas fa-filter"></i>
+    </div>
+
+    <div class="appointments">
+      <h3>Upcoming Appointments <a href="#">See All →</a></h3>
+      <div class="appointment-card">
+        <div class="card-info">
+          <img src="/images/patient1.jpg" alt="Sarah Johnson">
+          <div>
+            <strong>10:30 AM</strong><br>
+            <small>Sarah Johnson</small>
+          </div>
+        </div>
+        <span>Today</span>
+      </div>
+      <div class="appointment-card">
+        <div class="card-info">
+          <img src="/images/patient2.jpg" alt="David Lee">
+          <div>
+            <strong>2:15 PM</strong><br>
+            <small>David Lee</small>
+          </div>
+        </div>
+        <span>Tomorrow</span>
+      </div>
+    </div>
+
+    <div class="patients">
+  <h3>Your Patients <a href="#">See All →</a></h3>
+  
+  <% patients.forEach(patient => { %>
+  <a href="/connectpatient/<%=patient.chatLink%>" class="patient-link">
+    <div class="patient-card">
+      <div class="card-info">
+        <img src="<%= patient.profilePic || '/images/default.jpg' %>" alt="<%= patient.name %>">
+        <div>
+          <strong><%= patient.fullName %></strong><br>
+          <small><%= patient.age %> years • <%= patient.gender %> • <%= patient.condition %></small><br>
+          <small>Last active: <%= patient.lastActiveDisplay %></small>
+        </div>
+      </div>
+      <div class="card-status"><%= patient.status %></div>
+    </div>
+  </a>
+<% }) %>
+</div>
+
+
+  <div class="qr-modal" id="qrModal">
+    <img src="<%= qrPath %>" alt="QR Code">
+    <button onclick="closeQR()">Close</button>
+  </div>
+
+  <script>
+    function openQR() {
+      document.getElementById('qrModal').style.display = 'flex';
+    }
+    function closeQR() {
+      document.getElementById('qrModal').style.display = 'none';
+    }
+  </script>
+</body>
+</html>

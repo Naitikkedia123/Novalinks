@@ -1,29 +1,37 @@
 const express = require('express');
 const path = require('path');
 const http = require('http');
-const { Server } = require('socket.io');
 const mongoose = require('mongoose');
 const methodOverride = require('method-override');
 const session = require('express-session');
 const MongoStore = require('connect-mongo');
 const passport = require('passport');
 const LocalStrategy = require('passport-local');
+const { Server } = require('socket.io');
+const fs = require('fs');
+const QRCode = require('qrcode');
+const { v4: uuidv4 } = require('uuid');
 
-const User = require('./models/user');
+const Doctor = require('./models/doctor');
+const Patient = require('./models/patient');
 const Chat = require('./models/chat');
-const { isLoggedIn } = require('./middleware');
+const { isLoggedIn, isDoctor, isPatient } = require('./middleware');
+
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
-// Store online users with their socket IDs
+
+const qrDir = path.join(__dirname, 'public', 'qrcodes');
+if (!fs.existsSync(qrDir)) {
+  fs.mkdirSync(qrDir, { recursive: true });
+}
+
 const onlineUsers = new Map();
 
-// MongoDB connection
-async function main() {
-    await mongoose.connect('mongodb://localhost:27017');
-    console.log('Connected to MongoDB');
-}
-main().catch(err => console.error(err));
+// MongoDB Connection
+mongoose.connect('mongodb://localhost:27017/dharma')
+  .then(() => console.log('MongoDB connected'))
+  .catch(err => console.error(err));
 
 // Middleware
 app.use(methodOverride('_method'));
@@ -32,214 +40,438 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
-app.use('/uploads', express.static('uploads')); // Serve uploaded images
-// Session store
-const store = MongoStore.create({
-    mongoUrl: 'mongodb://localhost:27017',
-    crypto: { secret: 'your-secret-key' },
-    touchAfter: 24 * 3600
+app.use('/uploads', express.static('uploads'));
+
+// Session
+const sessionStore = MongoStore.create({
+  mongoUrl: 'mongodb://localhost:27017/dharma',
+  crypto: { secret: 'your-secret-key' },
+  touchAfter: 24 * 3600
 });
 
+app.use(session({
+  store: sessionStore,
+  secret: 'your-secret-key',
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    maxAge: 1000 * 60 * 60 * 24 * 7,
+    httpOnly: true
+  }
+}));
 
-const sessionOptions = {
-    store,
-    secret: 'your-secret-key',
-    resave: false,
-    saveUninitialized: false,
-    cookie: {
-        expires: Date.now() + 1000 * 60 * 60 * 24 * 7,
-        maxAge: 1000 * 60 * 60 * 24 * 7,
-        httpOnly: true
-    }
-};
-
-app.use(session(sessionOptions));
+// Passport setup
 app.use(passport.initialize());
 app.use(passport.session());
 
-passport.use(new LocalStrategy(User.authenticate()));
-passport.serializeUser(User.serializeUser());
-passport.deserializeUser(User.deserializeUser());
+passport.use('doctor', new LocalStrategy({ usernameField: 'phoneNumber' }, Doctor.authenticate()));
+passport.use('patient', new LocalStrategy({ usernameField: 'phoneNumber' }, Patient.authenticate()));
+
+passport.serializeUser((user, done) => {
+  const type = user instanceof Doctor ? 'Doctor' : 'Patient';
+  done(null, { id: user.id, type });
+});
+
+passport.deserializeUser(async (obj, done) => {
+  try {
+    const model = obj.type === 'Doctor' ? Doctor : Patient;
+    const user = await model.findById(obj.id);
+    done(null, user);
+  } catch (err) {
+    done(err);
+  }
+});
 
 // Global user
 app.use((req, res, next) => {
-    res.locals.currentUser = req.user;
-    next();
+  res.locals.currentUser = req.user;
+  next();
 });
 
 // Routes
 app.get('/', (req, res) => {
-    res.send('Welcome to ChatVerse!');
+  res.send('Welcome to Dharma!');
 });
 
-// Route to show users
-app.get('/users', isLoggedIn, async (req, res) => {
-    try {
-        const users = await User.find({ _id: { $ne: req.user._id } }); // Exclude the current user
-        res.render('users', { users, currentUser: req.user,onlineUserIds: Array.from(onlineUsers.keys()) });
-    } catch (err) {
+app.get('/doctor', (req, res) => {
+  res.render('doctorregister', { currentUser: req.user });
+});
+
+app.get('/patient', (req, res) => {
+  res.render('patientregister', { currentUser: req.user });
+});
+
+app.post('/docregister', async (req, res) => {
+  const { fullName, phoneNumber, email, licenseId, clinicLocation, password } = req.body;
+
+  try {
+    const existingPhone = await Doctor.findOne({ phoneNumber });
+    if (existingPhone) return res.redirect('/doctor?error=duplicate_phone');
+
+    const existingEmail = await Doctor.findOne({ email });
+    if (existingEmail) return res.redirect('/doctor?error=duplicate_email');
+
+    const existingLicense = await Doctor.findOne({ licenseId });
+    if (existingLicense) return res.redirect('/doctor?error=duplicate_license');
+
+    // Now everything passed, create and register
+    const newDoctor = new Doctor({
+      fullName, phoneNumber, email, licenseId, clinicLocation, chatLink: uuidv4()
+    });
+    await Doctor.register(newDoctor, password);
+
+    // Log in and generate QR
+    req.login(newDoctor, async (err) => {
+      if (err) {
         console.error(err);
-        res.redirect('/login?status=error');
+        return res.redirect('/doctor?error=login_failed');
+      }
+      const url = `http://localhost:10000/connect/${newDoctor.chatLink}`;
+      const qrDir = path.join(__dirname, 'public', 'qrcodes');
+      if (!fs.existsSync(qrDir)) fs.mkdirSync(qrDir, { recursive: true });
+      await QRCode.toFile(`${qrDir}/${newDoctor._id}.png`, url);
+      return res.redirect('/doctor-dashboard?status=success');
+    });
+
+  } catch (err) {
+    // **Handle Mongoose validation errors here** (invalid email, missing fields, etc.)
+    if (err.name === 'ValidationError') {
+      const messages = Object.values(err.errors)
+        .map(e => e.message)
+        .join(', ');
+      return res.redirect(
+        `/doctor?error=validation&details=${encodeURIComponent(messages)}`
+      );
     }
-});
-app.get('/signup', (req, res) => {
-    res.render('signup', { status: req.query.status });
+
+    // Fallback for anything else
+    return res.redirect('/doctor?error=internal');
+  }
 });
 
-app.post('/signup', async (req, res, next) => {
-    try {
-        const { username, email, password, gender } = req.body;
-        const newUser = new User({ username, email, gender });;
-        const registeredUser = await User.register(newUser, password);
-        req.login(registeredUser, err => {
-            if (err) return next(err);
-            res.redirect('/users?status=success');
-        });
-    } catch (e) {
-        console.error(e);
-        res.redirect('/signup?status=error');
+
+app.post('/patientregister', async (req, res) => {
+  const { fullName, phoneNumber, email, password, age, gender } = req.body;
+
+  try {
+    const existingPhone = await Patient.findOne({ phoneNumber });
+    if (existingPhone) return res.redirect('/patient?error=duplicate_phone');
+
+    const existingEmail = await Patient.findOne({ email });
+    if (existingEmail) return res.redirect('/patient?error=duplicate_email');
+
+    const newPatient = new Patient({ fullName, phoneNumber, email, age, gender,chatLink: uuidv4()});
+
+    await Patient.register(newPatient, password);
+
+    req.login(newPatient, (err) => {
+      if (err) {
+        console.error(err);
+        return res.redirect('/patient?error=login_failed');
+      }
+      return res.redirect('/patient-dashboard?status=success');
+    });
+  } catch (err) {
+    console.error(err);
+
+    if (err.name === 'ValidationError') {
+      const messages = Object.values(err.errors).map(e => e.message).join(', ');
+      return res.redirect(`/patient?error=validation&details=${encodeURIComponent(messages)}`);
     }
+
+    return res.redirect('/patient?error=internal');
+  }
 });
 
-app.get('/login', (req, res) => {
-    res.render('login', { status: req.query.status });
-});
-app.post('/logout', (req, res) => {
-    req.logout((err) => {
-        if (err) return next(err);
-        res.redirect('/login?status=success');
-    });
-});
-app.post('/login', passport.authenticate('local', {
-    successRedirect: '/users?status=success',
-    failureRedirect: '/login?status=error'
-}), (req, res) => {
-    io.emit('register', req.user._id); // Register the socket ID after login
-});
-io.on('connection', (socket) => {
-
-    // When a user registers, update their socket ID
-    socket.on('register', (userId) => {
-        // If the user is already registered with a socket ID, disconnect the old one
-        if (onlineUsers.has(userId)) {
-            const oldSocketId = onlineUsers.get(userId);
-            if (oldSocketId !== socket.id) {
-                console.log(`User ${userId} is reconnecting, removing old socket ${oldSocketId}`);
-                io.sockets.sockets.get(oldSocketId)?.disconnect(); // Disconnect the old socket
-            }
-        }
-    
-        // Register the new socket ID
-        onlineUsers.set(userId, socket.id);
-    
-        // Notify others this user is online
-        socket.broadcast.emit('user status', { userId, status: 'online' });
-    
-        // Send all currently online users to the newly connected user
-        for (let [onlineUserId] of onlineUsers.entries()) {
-            socket.emit('user status', { userId: onlineUserId, status: 'online' });
-        }
-    });
-    
-
-    // Handle private messages
-    socket.on('private message', async (data) => {
-        const { from, to, msg } = data;
-    
-        // Create and save the initial message with "sent" status
-        const chat = new Chat({ from, to, msg, status: 'sent' });
-        await chat.save();
-    
-        // Default response payload
-        const payload = {
-            ...data,
-            _id: chat._id,
-            createdAt: chat.createdAt, // Include createdAt timestamp
-        };
-    
-        const toSocketId = onlineUsers.get(to);
-        if (toSocketId) {
-            // Update to "delivered" and notify recipient
-            chat.status = 'delivered';
-            await chat.save();
-    
-            io.to(toSocketId).emit('private message', {
-                ...payload,
-                status: 'delivered'
-            });
-    
-            // Update sender with delivered status
-            socket.emit('private message', {
-                ...payload,
-                status: 'delivered'
-            });
-        } else {
-            // If recipient is offline, send "sent" status back to sender
-            socket.emit('private message', {
-                ...payload,
-                status: 'sent'
-            });
-        }
-    });
-    
-    
-    
-    
-    // When message is read
-    socket.on('read message', async ({ messageId }) => {
-        const chat = await Chat.findByIdAndUpdate(messageId, { status: 'read' });
-        if (chat) {
-            const fromSocket = onlineUsers.get(chat.from.toString());
-            if (fromSocket) {
-                io.to(fromSocket).emit('message read', { messageId });
-            }
-        }
-    });
-    
-
-    // Handle disconnection
-    // After a user registers with their socke
-    
-    socket.on('disconnect', () => {
-        for (let [userId, socketId] of onlineUsers.entries()) {
-            if (socketId === socket.id) {
-                onlineUsers.delete(userId);
-                socket.broadcast.emit('user status', { userId, status: 'offline' });
-                break;
-            }
-        }
-    });
+// Doctor login
+app.get('/doctorlogin', (req, res) => {
+  res.render('doctorlogin', { error: null });
 });
 
-app.get('/home', isLoggedIn, (req, res) => {
-    res.render('home', { currentUser: req.user, onlineUserIds: Array.from(onlineUsers.keys()) });
+app.post('/doctorlogin', (req, res, next) => {
+  passport.authenticate('doctor', (err, user, info) => {
+    if (err || !user) {
+      return res.render('doctorlogin', { error: 'Invalid credentials' });
+    }
+    req.logIn(user, err => {
+      if (err) return res.render('doctorlogin', { error: 'Login failed' });
+      return res.redirect('/doctor-dashboard');
+    });
+  })(req, res, next);
+});
+
+// Patient login
+app.get('/patientlogin', (req, res) => {
+  res.render('patientlogin', { error: null });
+});
+
+app.post('/patientlogin', (req, res, next) => {
+  passport.authenticate('patient', (err, user, info) => {
+    if (err || !user) {
+      return res.render('patientlogin', { error: 'Invalid credentials' });
+    }
+    req.logIn(user, err => {
+      if (err) return res.render('patientlogin', { error: 'Login failed' });
+      return res.redirect('/patient-dashboard');
+    });
+  })(req, res, next);
+});
+
+app.get('/doctor-dashboard', isDoctor, async(req, res) => {
+  const qrPath = `/qrcodes/${req.user._id}.png`;
+  const patients = await Patient.find({ _id: { $in: req.user.patients } });
+  res.render('doctor-dashboard', {
+    currentUser: req.user,
+    qrPath: qrPath,
+    patients: patients
+  });
+});
+app.get('/patient-dashboard', isPatient, async (req, res) => {
+  const error = req.query.error;
+  const doctorid = req.user.doctors[0] ? req.user.doctors[0] : null;
+
+  let doctor = null;
+  if (doctorid) {
+    doctor = await Doctor.findById(doctorid);
+  }
+
+  res.render('patient-Dashboard', {
+    currentUser: req.user,
+    error,
+    doctor,
+  });
+});
+
+app.get('/end-treatment', isPatient, async (req, res) => {
+  const patient = req.user;
+
+  try {
+    if (patient.doctors.length === 0) {
+      return res.redirect('/patient-dashboard?error=You are not connected to any doctor');
+    }
+
+    const doctorId = patient.doctors[0];
+    const doctor = await Doctor.findById(doctorId);
+
+    if (doctor) {
+      // Remove patient from doctor's list
+      doctor.patients = doctor.patients.filter(p => p.toString() !== patient._id.toString());
+      await doctor.save();
+    }
+
+    // Clear doctor from patient
+    patient.doctors = [];
+    await patient.save();
+
+    return res.redirect('/patient-dashboard?success=Treatment ended successfully');
+  } catch (err) {
+    console.error(err);
+    return res.redirect('/patient-dashboard?error=Something went wrong');
+  }
+});
+app.post('/logout', (req, res, next) => {
+  req.logout(err => {
+    if (err) return next(err);
+    res.redirect('/home?status=loggedout');
+  });
+});
+
+app.get('/home', (req, res) => {
+  res.render('home', {
+    currentUser: req.user,
+    onlineUserIds: Array.from(onlineUsers.keys())
+  });
+});
+
+app.get('/connect/:chatLink', isPatient, async (req, res) => {
+  const { chatLink } = req.params;
+  const patient = req.user;
+
+  try {
+    const doctor = await Doctor.findOne({ chatLink });
+    if (!doctor) return res.redirect('/home?error=doctor_not_found');
+
+    // Check if patient is already in treatment with a doctor
+    if (patient.doctors.length > 0) {
+      // Fetch the currently assigned doctor to display name
+      const existingDoctor = await Doctor.findById(patient.doctors[0]);
+      const doctorName = existingDoctor ? `Dr. ${existingDoctor.fullName}` : 'a doctor';
+
+      return res.redirect(`/patient-dashboard?error=You are already in treatment of ${doctorName}`);
+    }
+    // Add doctor to patient
+    patient.doctors.push(doctor._id);
+    await patient.save();
+
+    // Add patient to doctor
+    if (!doctor.patients.includes(patient._id)) {
+      doctor.patients.push(patient._id);
+      await doctor.save();
+    }
+
+    return res.redirect(`/${patient._id}/privatechat/${doctor._id}?role=Patient`);
+  } catch (err) {
+    console.error(err);
+    return res.redirect('/home?status=error');
+  }
+});
+
+app.get('/connectpatient/:chatLink', isDoctor, async (req, res) => {
+  const { chatLink } = req.params;
+  const doctor = req.user;
+
+  try {
+    const patient = await Patient.findOne({ chatLink });
+    if (!patient) return res.redirect('/home?error=Patient_not_found');
+
+    return res.redirect(`/${doctor._id}/privatechat/${patient._id}?role=Doctor`);
+  } catch (err) {
+    console.error(err);
+    return res.redirect('/home?status=error');
+  }
 });
 app.get('/:id/privatechat/:otherId', isLoggedIn, async (req, res) => {
-    const { id, otherId } = req.params;
-    const users = await User.find({ _id: { $ne: req.user._id } });
-    try {
-        const user = await User.findById(otherId); // Chat partner
-        if (!user) return res.redirect('/users?status=error');
+  const { id, otherId } = req.params;
 
-        const chats = await Chat.find({
-            $or: [
-                { from: id, to: otherId },
-                { from: otherId, to: id }
-            ]
-        }).populate('from').populate('to');
+  try {
+    const chats = await Chat.find({
+      $or: [{ from: id, to: otherId }, { from: otherId, to: id }]
+    }).populate('from to');
 
-        res.render('privatechat', { user, chats, currentUser: req.user,users,onlineUserIds: Array.from(onlineUsers.keys()) });
-    } catch (err) {
-        console.error(err);
-        res.redirect('/users?status=error');
+    const user = await Patient.findById(otherId) || await Doctor.findById(otherId);
+
+    let role;
+    if (await Doctor.findById(id)) role = 'doctor';
+    else if (await Patient.findById(id)) role = 'patient';
+
+    res.render('privatechat', {
+      user,
+      chats,
+      currentUser: req.user,
+      onlineUserIds: Array.from(onlineUsers.keys()),
+      role // 👈 pass the role here
+    });
+  } catch (err) {
+    console.error(err);
+    res.redirect('/home?status=error');
+  }
+});
+
+
+// Socket.IO
+io.on('connection', socket => {
+  socket.on('register', ({ userId, role }) => {
+  if (!userId || !role) return;
+
+  if (onlineUsers.has(userId)) {
+    const oldSocketId = onlineUsers.get(userId).socketId;
+    if (oldSocketId !== socket.id) {
+      io.sockets.sockets.get(oldSocketId)?.disconnect();
     }
+  }
+
+  // ✅ store socketId AND role
+  onlineUsers.set(userId, {
+    socketId: socket.id,
+    role: role.toLowerCase() // store as 'doctor' or 'patient'
+  });
+
+  socket.broadcast.emit('user status', { userId, status: 'online' });
+
+  for (let [id] of onlineUsers.entries()) {
+    socket.emit('user status', { userId: id, status: 'online' });
+  }
 });
-  
-// Start server
+
+  function capitalizeFirstLetter(string) {
+  return string.charAt(0).toUpperCase() + string.slice(1);
+}
+
+async function getUserRoleAndInfo(userId) {
+  let user = await Doctor.findById(userId).lean();
+  if (user) return { role: 'doctor', user };
+
+  user = await Patient.findById(userId).lean();
+  if (user) return { role: 'patient', user };
+
+  return null; // user not found
+}
+
+socket.on('private message', async ({ from, to, msg }) => {
+  try {
+    // Get roles and info from DB
+    const fromInfo = await getUserRoleAndInfo(from);
+    const toInfo = await getUserRoleAndInfo(to);
+
+    if (!fromInfo || !toInfo) {
+      console.error('User not found in database');
+      return;
+    }
+
+    const fromModelName = capitalizeFirstLetter(fromInfo.role);
+    const toModelName = capitalizeFirstLetter(toInfo.role);
+
+    // Save chat message with status 'sent'
+    const chat = new Chat({
+      from,
+      to,
+      fromModel: fromModelName,
+      toModel: toModelName,
+      msg,
+      status: 'sent'
+    });
+
+    await chat.save();
+
+    // Check if recipient is online to emit message immediately
+    const toSocketId = onlineUsers.get(to)?.socketId;
+
+    const payload = {
+      _id: chat._id,
+      from,
+      to,
+      fromModel: fromInfo.role,
+      toModel: toInfo.role,
+      msg,
+      createdAt: chat.createdAt
+    };
+
+    if (toSocketId) {
+      chat.status = 'delivered';
+      await chat.save();
+      io.to(toSocketId).emit('private message', { ...payload, status: 'delivered' });
+      socket.emit('private message', { ...payload, status: 'delivered' });
+    } else {
+      socket.emit('private message', { ...payload, status: 'sent' });
+    }
+  } catch (err) {
+    console.error('Error in private message handler:', err);
+  }
+});
+
+  socket.on('read message', async ({ messageId }) => {
+    const chat = await Chat.findByIdAndUpdate(messageId, { status: 'read' });
+    if (chat) {
+      const fromSocket = onlineUsers.get(chat.from.toString());
+      if (fromSocket) {
+        io.to(fromSocket).emit('message read', { messageId });
+      }
+    }
+  });
+
+ socket.on('disconnect', () => {
+  for (let [userId, data] of onlineUsers.entries()) {
+  if (data.socketId === socket.id) {
+    onlineUsers.delete(userId);
+    socket.broadcast.emit('user status', { userId, status: 'offline' });
+    break;
+  }
+}
+
+});
+
+});
+
 server.listen(10000, () => {
-    console.log('Server is running on port 10000');
+  console.log('Server running on port 10000');
 });
-
-
-
-

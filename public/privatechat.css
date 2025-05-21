@@ -146,8 +146,15 @@ body {
 }
 
 .back-button {
-  display: none;
-}
+    display: inline-block;
+    background-color: #4c4c6d;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    padding: 0.4rem 0.8rem;
+    cursor: pointer;
+    font-size: 1.5rem;
+  }
 
 #chat-box {
   flex: 1;
