@@ -13,14 +13,12 @@ body, html {
 
 /* Background */
 body {
-  background-color: #e7e4f8;
-  background-image: radial-gradient(#c9c4f5 1px, transparent 1px);
-  background-size: 20px 20px;
+  background-color: #e0f2f1;
 }
 
 .chatverse-container {
   display: flex;
-  height: 100dvh; /* ✅ use dynamic height */
+  height: 100dvh;
 }
 
 /* Sidebar */
@@ -43,11 +41,11 @@ body {
   display: flex;
   align-items: center;
   gap: 12px;
-  color: #5e44d0;
+  color: #00796b;
 }
 
 .logo span {
-  background: linear-gradient(45deg, #7b5df5, #b28efc);
+  background: linear-gradient(45deg, #009688, #4db6ac);
   background-clip: text;
   -webkit-background-clip: text;
   color: transparent;
@@ -66,7 +64,7 @@ body {
   padding: 0.6rem 0.8rem;
   border-radius: 8px;
   border: 1px solid #ccc;
-  background-color: #f5f4fa;
+  background-color: #f1f1f1;
   font-size: 1rem;
   margin-bottom: 1rem;
 }
@@ -79,7 +77,7 @@ body {
 }
 
 .user-card {
-  background-color: #e2dcf9;
+  background-color: #b2dfdb;
   border-radius: 12px;
   margin-bottom: 0.8rem;
   transition: background 0.3s, transform 0.2s;
@@ -88,7 +86,7 @@ body {
 
 .user-card a {
   text-decoration: none;
-  color: #3d2e8c;
+  color: #004d40;
   display: block;
 }
 
@@ -105,7 +103,7 @@ body {
   height: 38px;
   border-radius: 50%;
   object-fit: cover;
-  border: 1.5px solid #c3baf4;
+  border: 1.5px solid #009688;
 }
 
 .user-name {
@@ -114,7 +112,7 @@ body {
 }
 
 .user-card:hover {
-  background-color: #d1c6f5;
+  background-color: #80cbc4;
   transform: scale(1.01);
   cursor: pointer;
 }
@@ -124,12 +122,10 @@ body {
   flex-grow: 1;
   display: flex;
   flex-direction: column;
-  height: 100dvh; /* ✅ use dynamic height */
-  background-color: #e7e4f8;
-  background-image: radial-gradient(#c9c4f5 1px, transparent 1px);
-  background-size: 20px 20px;
-  backdrop-filter: blur(6px);
-  color: #3d2e8c;
+  height: 100dvh;
+  background-color: #e0f2f1;
+  background-image: none;
+  color: #004d40;
   position: relative;
 }
 
@@ -137,7 +133,7 @@ body {
   padding: 1rem 1.5rem;
   font-size: 1.2rem;
   font-weight: bold;
-  background-color: #4c4c6d;
+  background-color: #009688;
   color: #fff;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   display: flex;
@@ -146,15 +142,15 @@ body {
 }
 
 .back-button {
-    display: inline-block;
-    background-color: #4c4c6d;
-    color: white;
-    border: none;
-    border-radius: 6px;
-    padding: 0.4rem 0.8rem;
-    cursor: pointer;
-    font-size: 1.5rem;
-  }
+  display: inline-block;
+  background-color: #009688;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 0.4rem 0.8rem;
+  cursor: pointer;
+  font-size: 1.5rem;
+}
 
 #chat-box {
   flex: 1;
@@ -163,14 +159,14 @@ body {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  padding-bottom: 100px; /* for fixed form bar */
+  padding-bottom: 100px;
 }
 
 form#form {
   display: flex;
   gap: 10px;
   padding: 1rem;
-  background-color: #fff;
+  background-color: #ffffff;
   border-top: 1px solid #ccc;
   position: fixed;
   bottom: 0;
@@ -183,12 +179,13 @@ form#form input {
   flex: 1;
   padding: 0.8rem;
   border-radius: 8px;
-  border: 1px solid #ccc;
+  border: 1px solid #80cbc4;
+  background-color: #ffffff;
   font-size: 1rem;
 }
 
 form#form button {
-  background-color: #7b5df5;
+  background-color: #009688;
   color: white;
   border: none;
   border-radius: 8px;
@@ -199,7 +196,7 @@ form#form button {
 }
 
 form#form button:hover {
-  background-color: #5e44d0;
+  background-color: #00796b;
 }
 
 /* Messages */
@@ -213,19 +210,19 @@ form#form button:hover {
 
 .message.sent {
   align-self: flex-end;
-  background-color: #dcf8c6;
-  color: #2e3a59;
+  background-color: #a7ffeb;
+  color: #004d40;
 }
 
 .message.received {
   align-self: flex-start;
-  background-color: #f1f0f0;
-  color: #2e3a59;
+  background-color: #ffffff;
+  color: #004d40;
 }
 
 .meta {
   font-size: 0.75rem;
-  color: #6c757d;
+  color: #607d8b;
   display: flex;
   justify-content: space-between;
   margin-top: 4px;
@@ -234,11 +231,15 @@ form#form button:hover {
 .tick {
   margin-left: 8px;
   font-size: 0.9em;
-  color: gray;
+  color: #004d40;
 }
 
 .tick.read {
-  color: green;
+  color: #009688;
+}
+
+.double-read {
+  color: #00796b;
 }
 
 /* Placeholder */
@@ -276,7 +277,7 @@ form#form button:hover {
 }
 
 .logout button {
-  background: linear-gradient(45deg, #7b5df5, #b28efc);
+  background: linear-gradient(45deg, #009688, #4db6ac);
   color: white;
   border: none;
   padding: 0.4rem 0.8rem;
@@ -289,14 +290,14 @@ form#form button:hover {
 }
 
 .logout button:hover {
-  background: rgb(227, 113, 113);
+  background: #e57373;
   transform: scale(1.03);
 }
 
 .Welcome-name {
   font-size: 1.2rem;
   font-weight: 500;
-  color: #3d2e8c;
+  color: #004d40;
 }
 
 /* Scrollbar Styling */
@@ -336,7 +337,7 @@ form#form button:hover {
 
   .back-button {
     display: inline-block;
-    background-color: #4c4c6d;
+    background-color: #009688;
     color: white;
     border: none;
     border-radius: 6px;
@@ -361,11 +362,13 @@ form#form button:hover {
     font-size: 1rem;
   }
 }
+
+/* Toggle Buttons */
 .chat-toggle {
   display: flex;
   margin-bottom: 1.2rem;
   overflow: hidden;
-  border: 1px solid #d3cef5;
+  border: 1px solid #a7ffeb;
   box-shadow: inset 0 0 3px rgba(0, 0, 0, 0.05);
   width: 100%;
   margin-bottom: -10px;
@@ -374,8 +377,8 @@ form#form button:hover {
 .toggle-btn {
   flex: 1;
   padding: 0.7rem 1rem;
-  background-color: #f2f0fb;
-  color: #5e44d0;
+  background-color: #e0f2f1;
+  color: #00796b;
   font-weight: 500;
   font-size: 1rem;
   border: none;
@@ -389,19 +392,15 @@ form#form button:hover {
 }
 
 .toggle-btn:hover {
-  background-color: #e4ddfc;
+  background-color: #b2dfdb;
 }
 
 .toggle-btn.active {
-  background-color: #7b5df5;
+  background-color: #009688;
   color: white;
 }
+
 .fa-check {
   color: gray;
   margin-left: 5px;
 }
-.double-read {
-  color: blue;
-}
-
-
