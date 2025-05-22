@@ -2,12 +2,11 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Doctor Dashboard</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" />
-  <script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
-    <link rel="stylesheet" href="/doctor-dashboard.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css"/>
+  <link rel="stylesheet" href="/doctor-dashboard.css" />
 </head>
 <body>
   <div class="dashboard">
@@ -17,57 +16,60 @@
         <i class="fas fa-qrcode"></i>
       </div>
     </div>
-
+    <div class="main">
     <div class="search-box">
       <input type="text" placeholder="Search patients...">
       <i class="fas fa-filter"></i>
     </div>
 
-    <div class="appointments">
-      <h3>Upcoming Appointments <a href="#">See All →</a></h3>
-      <div class="appointment-card">
-        <div class="card-info">
-          <img src="/images/patient1.jpg" alt="Sarah Johnson">
-          <div>
-            <strong>10:30 AM</strong><br>
-            <small>Sarah Johnson</small>
+   <div class="appointments">
+  <h3>Upcoming Appointments <a href="#">See All →</a></h3>
+  <% if (appointments.length === 0) { %>
+    <p class="no-appointments">No upcoming appointments</p>
+  <% } else { %>
+    <% appointments.forEach(appointment => { %>
+      <div class="appointment-card" data-id="<%= appointment._id %>">
+        <button class="cancel-appointment" title="Cancel Appointment">&times;</button>
+        <div class="appointment-left">
+          <img src="/images/patient1.jpg" alt="<%= appointment.patient.fullName %>">
+          <div class="appointment-info">
+            <strong><i class="fas fa-clock"></i> <%= appointment.time %></strong>
+            <div class="appt-time"><%= appointment.patient.fullName %></div>
           </div>
         </div>
-        <span>Today</span>
-      </div>
-      <div class="appointment-card">
-        <div class="card-info">
-          <img src="/images/patient2.jpg" alt="David Lee">
-          <div>
-            <strong>2:15 PM</strong><br>
-            <small>David Lee</small>
-          </div>
-        </div>
-        <span>Tomorrow</span>
-      </div>
-    </div>
-
-    <div class="patients">
-  <h3>Your Patients <a href="#">See All →</a></h3>
-  
-  <% patients.forEach(patient => { %>
-  <a href="/connectpatient/<%=patient.chatLink%>" class="patient-link">
-    <div class="patient-card">
-      <div class="card-info">
-        <img src="<%= patient.profilePic || '/images/default.jpg' %>" alt="<%= patient.name %>">
-        <div>
-          <strong><%= patient.fullName %></strong><br>
-          <small><%= patient.age %> years • <%= patient.gender %> • <%= patient.condition %></small><br>
-          <small>Last active: <%= patient.lastActiveDisplay %></small>
+        <div class="appointment-date">
+          <i class="fas fa-calendar-alt"></i>
+          <span><%= new Date(appointment.date).toLocaleDateString('en-GB', {
+            weekday: 'short', day: 'numeric', month: 'short', year: 'numeric'
+          }) %></span>
         </div>
       </div>
-      <div class="card-status"><%= patient.status %></div>
-    </div>
-  </a>
-<% }) %>
+    <% }) %>
+  <% } %>
 </div>
 
 
+    <div class="patients">
+      <h3>Your Patients <a href="#">See All →</a></h3>
+      <% patients.forEach(patient => { %>
+        <a href="/connectpatient/<%=patient.chatLink%>" class="patient-link">
+          <div class="patient-card">
+            <div class="card-info">
+              <img src="<%= patient.profilePic || '/images/default.jpg' %>" alt="<%= patient.name %>">
+              <div>
+                <strong><%= patient.fullName %></strong>
+                <small><%= patient.age %> years • <%= patient.gender %> • <%= patient.condition %></small>
+                <small>Last active: <%= patient.lastActiveDisplay %></small>
+              </div>
+            </div>
+            <div class="card-status"><%= patient.status %></div>
+          </div>
+        </a>
+      <% }) %>
+    </div>
+  </div>
+  </div>
+  <!-- QR Modal -->
   <div class="qr-modal" id="qrModal">
     <img src="<%= qrPath %>" alt="QR Code">
     <button onclick="closeQR()">Close</button>
@@ -80,6 +82,51 @@
     function closeQR() {
       document.getElementById('qrModal').style.display = 'none';
     }
+
+  document.querySelectorAll('.cancel-appointment').forEach(button => {
+  button.addEventListener('click', async (event) => {
+    const card = event.target.closest('.appointment-card');
+    const appointmentId = card.getAttribute('data-id');
+
+    if (!confirm('Are you sure you want to cancel this appointment?')) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/appointments/${appointmentId}`, {
+  method: 'DELETE',
+  headers: { 'Content-Type': 'application/json' }
+});
+
+const contentType = response.headers.get('content-type');
+
+if (response.ok) {
+  if (contentType && contentType.includes('application/json')) {
+    const data = await response.json();
+    alert(data.message || 'Appointment cancelled successfully.');
+  } else {
+    // No JSON returned, still successful
+    alert('Appointment cancelled successfully.');
+  }
+  card.remove();
+} else {
+  // Response not OK
+  if (contentType && contentType.includes('application/json')) {
+    const errorData = await response.json();
+    alert('Failed to cancel appointment: ' + (errorData.message || response.statusText));
+  } else {
+    // Got HTML or something else
+    const text = await response.text();
+    alert('Failed to cancel appointment. Server response: ' + text);
+  }
+}
+
+    } catch (error) {
+      alert('Error cancelling appointment: ' + error.message);
+    }
+  });
+});
   </script>
 </body>
 </html>
+

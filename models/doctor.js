@@ -51,6 +51,22 @@ const doctorSchema = new mongoose.Schema({
       ref: 'patient'
     }
   ],
+  appointments: [
+    {
+      patient: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Patient",
+      },
+      date: {
+        type: String, // e.g., '2025-05-23'
+        required: true,
+      },
+      time: {
+        type: String, // e.g., '14:30'
+        required: true,
+      },
+    },
+  ],
   role: { type: String, default: 'doctor' }
 });
 

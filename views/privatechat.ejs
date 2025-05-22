@@ -15,12 +15,51 @@
 
     <main class="chat-area">
       <div class="chat-header">
-        <a href="javascript:void(0)" class="back-button" aria-label="Go back" onclick="history.back()">
-        <i class="fa-solid fa-arrow-left"></i>
-        </a>
+  <a href="javascript:void(0)" class="back-button" aria-label="Go back" onclick="history.back()">
+    <i class="fa-solid fa-arrow-left"></i>
+  </a>
 
-        <h3><%= user.fullName %> <span id="user-status">⚪ Offline</span></h3>
+  <div class="chat-header-info">
+    <h3>
+      <%= user.fullName %> 
+      <span id="user-status">⚪ Offline</span>
+    </h3>
+
+   <% if (user.role.toLowerCase() === 'patient') { %>
+  <!-- Full Button (visible on larger screens) -->
+  <button id="scheduleBtn" class="btn-schedule-appointment full-btn">
+    Schedule Appointment
+  </button>
+
+  <!-- Icon Button (visible on smaller screens) -->
+  <button id="scheduleBtnIcon" class="btn-schedule-appointment icon-btn" title="Schedule Appointment">
+    <i class="fa-regular fa-calendar-check"></i>
+  </button>
+<% } %>
+
+  </div>
+</div>
+
+<!-- Appointment Modal -->
+<div id="appointmentModal" class="appointment-modal hidden">
+  <div class="appointment-modal-content">
+    <h3 class="modal-title">Schedule Appointment</h3>
+    <form id="appointmentForm">
+  <label class="modal-label">
+    Date:
+    <input type="date" name="date" id="appointmentDate" class="modal-input" required>
+  </label>
+  <label class="modal-label">
+    Time:
+    <input type="time" name="time" id="appointmentTime" class="modal-input" required>
+  </label>
+      <div class="modal-actions">
+        <button type="button" id="cancelModal" class="modal-cancel">Cancel</button>
+        <button type="submit" class="modal-confirm">Confirm</button>
       </div>
+    </form>
+  </div>
+</div>
 
       <div id="chat-box">
         <% chats.forEach(chat => {
@@ -145,7 +184,6 @@
         document.getElementById('user-status').textContent = status === 'online' ? '🟢 Online' : '⚪ Offline';
       }
     });
-
     document.getElementById('user-search')?.addEventListener('input', e => {
       const query = e.target.value.toLowerCase();
       document.querySelectorAll('.user-card').forEach(card => {
@@ -165,5 +203,86 @@
       event.preventDefault();
     });
   </script>
+  <script>
+ const scheduleBtn = document.getElementById("scheduleBtn");
+const scheduleBtnIcon = document.getElementById("scheduleBtnIcon");
+const appointmentModal = document.getElementById("appointmentModal");
+const cancelModal = document.getElementById("cancelModal");
+const appointmentForm = document.getElementById("appointmentForm");
+
+// Function to open modal
+function openAppointmentModal() {
+  appointmentModal.classList.remove("hidden");
+}
+
+// Function to close modal
+function closeAppointmentModal() {
+  appointmentModal.classList.add("hidden");
+}
+
+// Attach click listeners to both buttons
+scheduleBtn?.addEventListener("click", openAppointmentModal);
+scheduleBtnIcon?.addEventListener("click", openAppointmentModal);
+
+// Cancel button closes modal
+cancelModal?.addEventListener("click", closeAppointmentModal);
+
+// Form submission
+appointmentForm?.addEventListener("submit", (e) => {
+  e.preventDefault();
+  const date = appointmentForm.date.value;
+  const time = appointmentForm.time.value;
+
+  // Emit appointment info to server (adjust if needed)
+  socket.emit("schedule_appointment", {
+     doctorID: "<%= currentUser._id %>",
+      patientID:"<%= user._id %>" ,
+      date,
+      time,
+  });
+
+  closeAppointmentModal();
+  appointmentForm.reset();
+});
+</script>
+<script>
+  const dateInput = document.getElementById('appointmentDate');
+  const timeInput = document.getElementById('appointmentTime');
+
+  // Set today's date as the minimum date
+  const today = new Date();
+  const yyyy = today.getFullYear();
+  const mm = String(today.getMonth() + 1).padStart(2, '0');
+  const dd = String(today.getDate()).padStart(2, '0');
+  const todayStr = `${yyyy}-${mm}-${dd}`;
+  dateInput.min = todayStr;
+
+  function updateTimeMin() {
+    const selectedDate = dateInput.value;
+    const now = new Date();
+    const selected = new Date(selectedDate + "T00:00");
+
+    if (
+      selected.getFullYear() === now.getFullYear() &&
+      selected.getMonth() === now.getMonth() &&
+      selected.getDate() === now.getDate()
+    ) {
+      // If selected date is today, set time min to current time + 1 hour
+      now.setHours(now.getHours() + 1);
+      const hh = String(now.getHours()).padStart(2, '0');
+      const mins = String(now.getMinutes()).padStart(2, '0');
+      timeInput.min = `${hh}:${mins}`;
+    } else {
+      // Reset min time
+      timeInput.min = "00:00";
+    }
+  }
+
+  // Update time min whenever date changes
+  dateInput.addEventListener('change', updateTimeMin);
+
+  // Initial setup
+  updateTimeMin();
+</script>
 </body>
 </html>

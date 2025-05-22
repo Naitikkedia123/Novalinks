@@ -42,6 +42,27 @@
       <div class="condition-status">
         <strong>Condition:</strong> Under Treatment
       </div>
+           <div class="appointments">
+  <h3>Your Upcoming Appointments</h3>
+
+  <% if (appointments.length === 0) { %>
+    <p>No upcoming appointments</p>
+  <% } else { %>
+    <% appointments.forEach(appointment => { %>
+      <div class="appointment-card">
+        <div class="appointment-time">
+  <i class="fas fa-clock"></i> <strong><%= appointment.time %></strong>
+</div>
+<div class="appointment-date">
+  <i class="fas fa-calendar-alt"></i>
+  <span><%= new Date(appointment.date).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }) %></span>
+</div>
+      </div>
+    <% }) %>
+  <% } %>
+</div>
+
+
       <div class="doctor-actions">
       <a href="/<%=currentUser._id%>/privatechat/<%=doctor._id%>?role=Patient" class="button primary">Chat</a>
       <a href="/end-treatment" class="button danger">End Treatment</a>

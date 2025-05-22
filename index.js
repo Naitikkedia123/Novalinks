@@ -217,30 +217,63 @@ app.post('/patientlogin', (req, res, next) => {
   })(req, res, next);
 });
 
-app.get('/doctor-dashboard', isDoctor, async(req, res) => {
+app.get('/doctor-dashboard', isDoctor, async (req, res) => {
   const qrPath = `/qrcodes/${req.user._id}.png`;
-  const patients = await Patient.find({ _id: { $in: req.user.patients } });
+
+  const patients = await Patient.find({
+    _id: { $in: req.user.patients }
+  });
+
+  const doctor = await Doctor.findById(req.user._id)
+    .populate('appointments.patient', 'fullName')
+    .lean();
+
+  const now = new Date();
+
+  // Filter upcoming appointments
+  const appointments = (doctor.appointments || []).filter(appt => {
+    const apptDateTime = new Date(`${appt.date}T${appt.time}`);
+    return apptDateTime > now;
+  });
+
   res.render('doctor-dashboard', {
     currentUser: req.user,
-    qrPath: qrPath,
-    patients: patients
+    qrPath,
+    patients,
+    appointments
   });
 });
+
+
 app.get('/patient-dashboard', isPatient, async (req, res) => {
   const error = req.query.error;
   const doctorid = req.user.doctors[0] ? req.user.doctors[0] : null;
 
   let doctor = null;
+  let appointments = [];
+
   if (doctorid) {
-    doctor = await Doctor.findById(doctorid);
+    doctor = await Doctor.findById(doctorid).lean();
+
+    // Find upcoming appointments for this patient
+    const now = new Date();
+
+    appointments = (doctor.appointments || []).filter(appt => {
+      return (
+        String(appt.patient) === String(req.user._id) &&
+        new Date(`${appt.date}T${appt.time}`) > now
+      );
+    });
   }
 
   res.render('patient-Dashboard', {
     currentUser: req.user,
     error,
     doctor,
+    appointments,
   });
 });
+
 
 app.get('/end-treatment', isPatient, async (req, res) => {
   const patient = req.user;
@@ -458,19 +491,71 @@ socket.on('private message', async ({ from, to, msg }) => {
       }
     }
   });
+socket.on("schedule_appointment", async ({ doctorID, patientID, date, time }) => {
+  try {
+    // Update Doctor
+    await Doctor.findByIdAndUpdate(doctorID, {
+      $push: {
+        appointments: {
+          patient: patientID,
+          date,
+          time,
+        },
+      },
+    });
 
- socket.on('disconnect', () => {
-  for (let [userId, data] of onlineUsers.entries()) {
-  if (data.socketId === socket.id) {
-    onlineUsers.delete(userId);
-    socket.broadcast.emit('user status', { userId, status: 'offline' });
-    break;
+    // Update Patient
+    await Patient.findByIdAndUpdate(patientID, {
+      $push: {
+        appointments: {
+          doctor: doctorID,
+          date,
+          time,
+        },
+      },
+    });
+
+  } catch (err) {
+    console.error('Error scheduling appointment:', err);
   }
-}
+});
+
+
+  socket.on('disconnect', () => {
+    for (let [userId, data] of onlineUsers.entries()) {
+    if (data.socketId === socket.id) {
+      onlineUsers.delete(userId);
+      socket.broadcast.emit('user status', { userId, status: 'offline' });
+      break;
+    }
+  }
 
 });
 
 });
+app.delete('/appointments/:id', async (req, res) => {
+  const appointmentId = req.params.id;
+
+  try {
+    // Remove appointment from all doctors who have it
+    await Doctor.updateMany(
+      {},
+      { $pull: { appointments: { _id: appointmentId } } }
+    );
+
+    // Also remove from patients if you have a similar structure (optional)
+    await Patient.updateMany(
+      {},
+      { $pull: { appointments: { _id: appointmentId } } }
+    );
+
+    res.status(200).json({ message: 'Appointment cancelled successfully' });
+  } catch (error) {
+    console.error('Error cancelling appointment:', error);
+    res.status(500).json({ message: 'Failed to cancel appointment' });
+  }
+});
+
 
 server.listen(10000, () => {
   console.log('Server running on port 10000');

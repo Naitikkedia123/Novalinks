@@ -1,15 +1,16 @@
- /* Base Styles */
 body {
   margin: 0;
   font-family: 'Inter', sans-serif;
   background-color: #f4f9f8;
   color: #333;
+  line-height: 1.6;
 }
 
 a {
   text-decoration: none;
 }
 
+/* Error Box */
 .error-msg {
   background-color: #f8d7da;
   color: #721c24;
@@ -18,6 +19,7 @@ a {
   border-radius: 8px;
   margin: 15px;
   position: relative;
+  font-size: 14px;
 }
 
 #errorBox span {
@@ -26,20 +28,24 @@ a {
   top: 10px;
   cursor: pointer;
   font-weight: bold;
+  font-size: 18px;
 }
 
+/* Header */
 .dashboard-header {
-  background-color: #e0f3ec;
+  background-color: #d9ffebcc;
   padding: 20px;
   display: flex;
   justify-content: space-between;
   align-items: center;
   flex-wrap: wrap;
+  border-bottom: 1px solid #b9eac8;
 }
 
 .dashboard-header h1 {
   font-size: 24px;
   margin: 0;
+  color: #198754;
 }
 
 .dashboard-header p {
@@ -55,51 +61,115 @@ a {
   box-shadow: 0 0 8px rgba(0,0,0,0.1);
   cursor: pointer;
   font-size: 20px;
+  transition: transform 0.2s ease;
 }
 
+.qr-trigger:hover {
+  transform: scale(1.1);
+}
+
+/* Main */
 .dashboard-main {
   padding: 20px;
 }
 
+/* Card */
 .card {
   background: #fff;
-  padding: 20px;
-  border-radius: 14px;
-  box-shadow: 0 3px 10px rgba(0,0,0,0.06);
-  margin-bottom: 20px;
+  padding: 24px;
+  border-radius: 16px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+  margin-bottom: 24px;
 }
 
+/* Profile Info */
 .profile-info {
   display: flex;
-  gap: 15px;
+  gap: 16px;
   align-items: center;
   flex-wrap: wrap;
+  margin-bottom: 12px;
 }
 
 .profile-info img {
-  width: 60px;
-  height: 60px;
+  width: 64px;
+  height: 64px;
   border-radius: 50%;
   object-fit: cover;
 }
 
 .profile-info h3 {
   margin: 0;
-  font-size: 18px;
+  font-size: 20px;
+  color: #1d1d1f;
 }
 
 .profile-info p {
   margin: 2px 0;
-  font-size: 13px;
+  font-size: 14px;
   color: #777;
 }
 
+/* Status */
 .condition-status {
-  margin-top: 20px;
+  margin-top: 12px;
   font-size: 15px;
-  color: #333;
+  color: #444;
 }
 
+/* Appointments Section */
+.appointments, .patients {
+  background: #d9ffebcc;
+  border-left: 5px solid #198754;
+  border-radius: 12px;
+  padding: 24px;
+  margin-top: 20px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+}
+
+.appointments h3, .patients h3 {
+  margin: 0 0 10px;
+  font-size: 18px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: #198754;
+  font-weight: 600;
+}
+
+.appointments p {
+  margin: 0;
+  color: #198754;
+  font-size: 14px;
+}
+
+.appointment-card, .patient-card {
+  background: white;
+  border-left: 4px solid #198754;
+  border-radius: 12px;
+  padding: 16px 20px;
+  margin-top: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 15px;
+  font-weight: 500;
+  color: #145c42;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.appointment-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
+}
+
+.appointment-card strong {
+  color: #198754;
+  font-size: 16px;
+}
+
+/* Buttons */
 .button {
   display: inline-block;
   margin-top: 20px;
@@ -107,11 +177,27 @@ a {
   font-weight: 600;
   border-radius: 8px;
   text-align: center;
+  font-size: 14px;
+  transition: all 0.3s ease;
+  margin-right: 10px;
+}
+
+.button.primary {
+  background-color: #198754;
+  color: white;
+}
+
+.button.primary:hover {
+  background-color: #146c43;
 }
 
 .button.danger {
   background-color: #dc3545;
   color: white;
+}
+
+.button.danger:hover {
+  background-color: #bd2130;
 }
 
 /* QR Modal */
@@ -129,8 +215,8 @@ a {
 
 #qrModalContent {
   background: white;
-  padding: 20px;
-  border-radius: 14px;
+  padding: 24px;
+  border-radius: 16px;
   width: 320px;
   display: flex;
   flex-direction: column;
@@ -161,7 +247,7 @@ a {
   cursor: pointer;
 }
 
-/* Responsive */
+/* Mobile Responsiveness */
 @media (max-width: 600px) {
   .dashboard-header h1 {
     font-size: 20px;
@@ -173,32 +259,32 @@ a {
   }
 
   .button {
-    font-size: 14px;
+    font-size: 13px;
     padding: 8px 12px;
   }
-}
-.button {
-  padding: 10px 15px;
-  border-radius: 8px;
-  text-decoration: none;
-  font-weight: 600;
-  display: inline-block;
-  text-align: center;
-  margin-right: 10px;
-}
 
-.button.primary {
-  background-color: #20c997; /* Soft teal (matches the e0f3ec background) */
-  color: white;
-  transition: background-color 0.3s ease;
+  .appointments h3 {
+    font-size: 16px;
+  }
+
+  .appointment-card {
+    font-size: 14px;
+    flex-direction: column;
+    align-items: flex-start;
+  }
 }
 
-.button.primary:hover {
-  background-color: #17a589; /* Slightly darker on hover */
+.qr-trigger {
+  font-size: 1.6rem;
+  color: #1E4437;
+  background-color: #C8F8DC;
+  padding: 10px;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: transform 0.3s, background-color 0.3s;
 }
 
-
-.button.danger {
-  background-color: #dc3545;
-  color: white;
+.qr-trigger:hover {
+  background-color: #A9EFC6;
+  transform: scale(1.1);
 }

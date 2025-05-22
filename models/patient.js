@@ -46,6 +46,22 @@ const patientSchema = new mongoose.Schema({
       ref: 'doctor'
     }
   ],
+  appointments: [
+    {
+      doctor: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Doctor",
+      },
+      date: {
+        type: String, // e.g., '2025-05-23'
+        required: true,
+      },
+      time: {
+        type: String, // e.g., '14:30'
+        required: true,
+      },
+    },
+  ],
   chatLink: {
     type: String,
     unique: true
