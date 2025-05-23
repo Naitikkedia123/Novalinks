@@ -127,6 +127,9 @@ body {
   background-image: none;
   color: #004d40;
   position: relative;
+   background-image: radial-gradient(#c9c4f5 1px, transparent 1px);
+  background-size: 20px 20px;
+  backdrop-filter: blur(6px);
 }
 
 .chat-header {

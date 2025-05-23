@@ -225,7 +225,7 @@ app.get('/doctor-dashboard', isDoctor, async (req, res) => {
   });
 
   const doctor = await Doctor.findById(req.user._id)
-    .populate('appointments.patient', 'fullName')
+    .populate('appointments.patient', 'fullName gender')
     .lean();
 
   const now = new Date();
@@ -520,7 +520,6 @@ socket.on("schedule_appointment", async ({ doctorID, patientID, date, time }) =>
   }
 });
 
-
   socket.on('disconnect', () => {
     for (let [userId, data] of onlineUsers.entries()) {
     if (data.socketId === socket.id) {
@@ -555,7 +554,15 @@ app.delete('/appointments/:id', async (req, res) => {
     res.status(500).json({ message: 'Failed to cancel appointment' });
   }
 });
-
+app.get('/logout', (req, res) => {
+  req.logout(err => {
+    if (err) {
+      console.error(err);
+      return res.redirect('/home?error=logout_failed');
+    }
+    res.redirect('/home?status=loggedout');
+  });
+});
 
 server.listen(10000, () => {
   console.log('Server running on port 10000');

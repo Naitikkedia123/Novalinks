@@ -11,10 +11,17 @@
 <body>
   <div class="dashboard">
     <div class="header">
-      <h2>Welcome back, Dr. <%= currentUser.fullName %></h2>
-      <div class="qr-icon" onclick="openQR()">
-        <i class="fas fa-qrcode"></i>
-      </div>
+  <h2>Welcome back, Dr. <%= currentUser.fullName %></h2>
+  <div style="display: flex; gap: 1rem;">
+    <div class="qr-icon" onclick="openQR()">
+      <i class="fas fa-qrcode"></i>
+    </div>
+    <div class="logout-btn" onclick="window.location.href='/logout'">
+      <i class="fas fa-sign-out-alt"></i>
+    </div>
+  </div>
+</div>
+
     </div>
     <div class="main">
     <div class="search-box">
@@ -31,7 +38,11 @@
       <div class="appointment-card" data-id="<%= appointment._id %>">
         <button class="cancel-appointment" title="Cancel Appointment">&times;</button>
         <div class="appointment-left">
-          <img src="/images/patient1.jpg" alt="<%= appointment.patient.fullName %>">
+          <%if(appointment.patient.gender=='male'){%>
+          <img src="/uploads/male.jpg" alt="<%= appointment.patient.fullName %>">
+          <%}else{%>
+            <img src="/uploads/female.jpg" alt="<%= appointment.patient.fullName %>">
+          <%}%>
           <div class="appointment-info">
             <strong><i class="fas fa-clock"></i> <%= appointment.time %></strong>
             <div class="appt-time"><%= appointment.patient.fullName %></div>
@@ -55,7 +66,11 @@
         <a href="/connectpatient/<%=patient.chatLink%>" class="patient-link">
           <div class="patient-card">
             <div class="card-info">
-              <img src="<%= patient.profilePic || '/images/default.jpg' %>" alt="<%= patient.name %>">
+              <%if(patient.gender=='male'){%>
+              <img src="/uploads/male.jpg" alt="<%=patient.fullName %>">
+              <%}else{%>
+                <img src="/uploads/female.jpg" alt="<%=patient.fullName %>">
+              <%}%>
               <div>
                 <strong><%= patient.fullName %></strong>
                 <small><%= patient.age %> years • <%= patient.gender %> • <%= patient.condition %></small>
