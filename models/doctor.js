@@ -67,7 +67,12 @@ const doctorSchema = new mongoose.Schema({
       },
     },
   ],
-  role: { type: String, default: 'doctor' }
+  role: { type: String, default: 'doctor' },
+  qr: {
+    type: String,
+    unique: true,
+    sparse: true // Allows for null values without enforcing uniqueness
+  }
 });
 
 doctorSchema.plugin(passportLocalMongoose, { usernameField: 'phoneNumber' });

@@ -63,7 +63,7 @@
     <div class="patients">
       <h3>Your Patients <a href="#">See All →</a></h3>
       <% patients.forEach(patient => { %>
-        <a href="/connectpatient/<%=patient.chatLink%>" class="patient-link">
+        <a href="/docpatient/<%=patient._id%>" class="patient-link">
           <div class="patient-card">
             <div class="card-info">
               <%if(patient.gender=='male'){%>
@@ -85,11 +85,42 @@
   </div>
   </div>
   <!-- QR Modal -->
-  <div class="qr-modal" id="qrModal">
-    <img src="<%= qrPath %>" alt="QR Code">
-    <button onclick="closeQR()">Close</button>
+  <!-- QR Modal -->
+<div class="qr-modal" id="qrModal">
+  <img id="qrImage" src="<%= currentUser.qr %>" alt="QR Code">
+  
+  <div class="qr-actions">
+    <a id="downloadQRBtn" download="doctor-qr.png" class="download-btn" href="<%= currentUser.qr %>">
+      <i class="fas fa-download"></i> Download QR
+    </a>
+    <button onclick="closeQR()" class="close-btn">Close</button>
   </div>
+</div>
 
+
+<script>
+  document.getElementById("downloadQRBtn").addEventListener("click", function (e) {
+    e.preventDefault();
+    const qrUrl = "<%= currentUser.qr %>";
+
+    const newTab = window.open();
+    fetch(qrUrl)
+      .then(res => res.blob())
+      .then(blob => {
+        const url = URL.createObjectURL(blob);
+        newTab.location.href = url;
+
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "doctor-qr.png";
+        newTab.document.body.appendChild(a);
+        a.click();
+
+        // Clean up
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+      });
+  });
+</script>
   <script>
     function openQR() {
       document.getElementById('qrModal').style.display = 'flex';

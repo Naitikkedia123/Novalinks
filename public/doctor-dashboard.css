@@ -197,7 +197,6 @@ body {
   font-size: 2rem;
   color: #0284c7;
   padding: 10px;
-  border-radius: 12px;
   cursor: pointer;
   transition: transform 0.3s, background-color 0.3s;
 }
@@ -226,7 +225,6 @@ body {
   width: 280px;
   height: 280px;
   border: 5px solid #fff;
-  border-radius: 12px;
 }
 
 .qr-modal button {
@@ -476,7 +474,6 @@ body {
   width: 280px;
   height: 280px;
   border: 6px solid #fff;
-  border-radius: 16px;
 }
 
 .qr-modal button {
@@ -597,4 +594,27 @@ body {
   .logout-btn {
     padding: 10px;
   }
+}
+.qr-actions {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+  margin-top: 1rem;
+}
+
+.download-btn {
+  background-color: #007bff;
+  color: white;
+  padding: 0.6rem 1.2rem;
+  border: none;
+  border-radius: 6px;
+  text-decoration: none;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.download-btn:hover {
+  background-color: #0056b3;
 }

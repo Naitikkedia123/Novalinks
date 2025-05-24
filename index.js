@@ -11,10 +11,10 @@ const { Server } = require('socket.io');
 const fs = require('fs');
 const QRCode = require('qrcode');
 const { v4: uuidv4 } = require('uuid');
-
 const Doctor = require('./models/doctor');
 const Patient = require('./models/patient');
 const Chat = require('./models/chat');
+const Timeline = require("./models/timeline");
 const { isLoggedIn, isDoctor, isPatient } = require('./middleware');
 
 const app = express();
@@ -27,6 +27,12 @@ if (!fs.existsSync(qrDir)) {
 }
 
 const onlineUsers = new Map();
+const multer = require('multer');
+const { cloudinary, storage } = require('./utils/cloudinary');
+const { constants } = require('buffer');
+const upload = multer({ storage });
+const router = express.Router();
+
 
 // MongoDB Connection
 mongoose.connect('mongodb://localhost:27017/dharma')
@@ -48,7 +54,6 @@ const sessionStore = MongoStore.create({
   crypto: { secret: 'your-secret-key' },
   touchAfter: 24 * 3600
 });
-
 app.use(session({
   store: sessionStore,
   secret: 'your-secret-key',
@@ -93,6 +98,77 @@ app.get('/', (req, res) => {
   res.send('Welcome to Dharma!');
 });
 
+app.post('/upload-image', upload.single('image'), async (req, res) => {
+  try {
+    const { to, caption } = req.body;
+    const from = req.user._id;
+
+    const fromModel = req.user.role.charAt(0).toUpperCase() + req.user.role.slice(1).toLowerCase();
+    const toModel = fromModel === 'Doctor' ? 'Patient' : 'Doctor';
+
+    const result = await cloudinary.uploader.upload(req.file.path);
+
+    const chat = new Chat({
+      from,
+      fromModel,
+      to,
+      toModel,
+      msg: result.secure_url,
+      type: 'image',
+      caption: caption || '',
+      status: 'sent',
+    });
+
+    await chat.save();
+
+    const doctorId = req.user.role === 'doctor' ? from : to;
+    const patientId = req.user.role === 'patient' ? from : to;
+
+    await Timeline.create({
+      from,
+      to,
+      fromModel,
+      toModel,
+      doctorId,
+      patientId,
+      imageUrl: result.secure_url,
+      caption: caption && caption.trim() !== '' ? caption.trim() : 'Treatment Update'
+    });
+
+
+    // ✅ Emit message
+    const toSocketId = onlineUsers.get(to)?.socketId;
+    const payload = {
+      _id: chat._id,
+      from,
+      to,
+      fromModel: req.user.role.toLowerCase(),
+      toModel: toModel.toLowerCase(),
+      msg: chat.msg,
+      caption: chat.caption,
+      type: 'image',
+      createdAt: chat.createdAt,
+      status: 'sent'
+    };
+
+    if (toSocketId) {
+      payload.status = 'delivered';
+      await chat.updateOne({ status: 'delivered' });
+      io.to(toSocketId).emit('private message', payload);
+    }
+
+    io.to(onlineUsers.get(from.toString())?.socketId).emit('private message', payload);
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Image upload failed:', err);
+    res.status(500).json({ error: 'Failed to upload image' });
+  }
+});
+
+
+
+
 app.get('/doctor', (req, res) => {
   res.render('doctorregister', { currentUser: req.user });
 });
@@ -105,6 +181,7 @@ app.post('/docregister', async (req, res) => {
   const { fullName, phoneNumber, email, licenseId, clinicLocation, password } = req.body;
 
   try {
+    // Duplicate checks
     const existingPhone = await Doctor.findOne({ phoneNumber });
     if (existingPhone) return res.redirect('/doctor?error=duplicate_phone');
 
@@ -114,38 +191,61 @@ app.post('/docregister', async (req, res) => {
     const existingLicense = await Doctor.findOne({ licenseId });
     if (existingLicense) return res.redirect('/doctor?error=duplicate_license');
 
-    // Now everything passed, create and register
+    // Create doctor (but don't save yet)
     const newDoctor = new Doctor({
-      fullName, phoneNumber, email, licenseId, clinicLocation, chatLink: uuidv4()
+      fullName,
+      phoneNumber,
+      email,
+      licenseId,
+      clinicLocation,
+      chatLink: uuidv4()
     });
+
     await Doctor.register(newDoctor, password);
 
-    // Log in and generate QR
+    // Login doctor
     req.login(newDoctor, async (err) => {
       if (err) {
         console.error(err);
         return res.redirect('/doctor?error=login_failed');
       }
+
+      // Generate QR code image and save it temporarily
       const url = `http://localhost:10000/connect/${newDoctor.chatLink}`;
-      const qrDir = path.join(__dirname, 'public', 'qrcodes');
-      if (!fs.existsSync(qrDir)) fs.mkdirSync(qrDir, { recursive: true });
-      await QRCode.toFile(`${qrDir}/${newDoctor._id}.png`, url);
+      const qrFilePath = path.join(__dirname, 'temp', `${newDoctor._id}-qr.png`);
+
+      // Ensure temp folder exists
+      const tempDir = path.dirname(qrFilePath);
+      if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
+
+      await QRCode.toFile(qrFilePath, url);
+
+      // Upload QR to Cloudinary
+      const qrUpload = await cloudinary.uploader.upload(qrFilePath, {
+        folder: 'doctor_qrcodes'
+      });
+
+      // Store QR URL in DB
+      newDoctor.qr = qrUpload.secure_url;
+      await newDoctor.save();
+
+      // Clean up temp file
+      fs.unlinkSync(qrFilePath);
+
       return res.redirect('/doctor-dashboard?status=success');
     });
 
   } catch (err) {
-    // **Handle Mongoose validation errors here** (invalid email, missing fields, etc.)
+    // Mongoose validation error
     if (err.name === 'ValidationError') {
       const messages = Object.values(err.errors)
         .map(e => e.message)
         .join(', ');
-      return res.redirect(
-        `/doctor?error=validation&details=${encodeURIComponent(messages)}`
-      );
+      return res.redirect(`/doctor?error=validation&details=${encodeURIComponent(messages)}`);
     }
 
-    // Fallback for anything else
-    return res.redirect('/doctor?error=internal');
+    console.error(err);
+    return res.redirect('/doctor?error=unknown');
   }
 });
 
@@ -265,13 +365,50 @@ app.get('/patient-dashboard', isPatient, async (req, res) => {
       );
     });
   }
+ const timeline = await Timeline.find({ patientId: req.user._id })
+  .populate('from', 'fullName role')   // Populate `from` with only fullName
+  .populate('to', 'fullName role')     // Populate `to` with only fullName
+  .sort({ createdAt: 1 });
 
   res.render('patient-Dashboard', {
     currentUser: req.user,
     error,
     doctor,
     appointments,
+    timeline,
   });
+});
+
+app.get('/docpatient/:id', isDoctor, async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const now = new Date(); // <-- this was missing
+
+    const patient = await Patient.findById(id).populate('appointments.doctor', 'fullName gender');
+    if (!patient) return res.redirect('/doctor-dashboard?error=Patient not found');
+
+    const appointments = (req.user.appointments || []).filter(appt => {
+      return (
+        String(appt.patient) === String(patient._id) &&
+        new Date(`${appt.date}T${appt.time}`) > now
+      );
+    });
+   const timeline = await Timeline.find({ patientId: id })
+  .populate('from', 'fullName role')   // Populate `from` with only fullName
+  .populate('to', 'fullName role')     // Populate `to` with only fullName
+  .sort({ createdAt: 1 });
+
+    res.render('docpatient', {
+      currentUser: req.user,
+      patient,
+      appointments,
+      timeline,
+    });
+  } catch (err) {
+    console.error(err);
+    res.redirect('/doctor-dashboard?error=Something went wrong');
+  }
 });
 
 
@@ -296,6 +433,8 @@ app.get('/end-treatment', isPatient, async (req, res) => {
     patient.doctors = [];
     await patient.save();
 
+    await Timeline.deleteMany({ patientId: patient._id, doctorId });
+
     return res.redirect('/patient-dashboard?success=Treatment ended successfully');
   } catch (err) {
     console.error(err);
@@ -319,7 +458,7 @@ app.get('/home', (req, res) => {
 app.get('/connect/:chatLink', isPatient, async (req, res) => {
   const { chatLink } = req.params;
   const patient = req.user;
-
+  
   try {
     const doctor = await Doctor.findOne({ chatLink });
     if (!doctor) return res.redirect('/home?error=doctor_not_found');
@@ -341,8 +480,22 @@ app.get('/connect/:chatLink', isPatient, async (req, res) => {
       doctor.patients.push(patient._id);
       await doctor.save();
     }
-
-    return res.redirect(`/${patient._id}/privatechat/${doctor._id}?role=Patient`);
+    const from = req.user._id;
+    const to = doctor._id;
+    const doctorId = req.user.role === 'doctor' ? from : to;
+    const patientId = req.user.role === 'patient' ? from : to;
+    const fromModel = req.user.role.charAt(0).toUpperCase() + req.user.role.slice(1).toLowerCase();
+    const toModel = fromModel === 'Doctor' ? 'Patient' : 'Doctor';
+    await Timeline.create({
+      from,
+      to,
+      fromModel,
+      toModel,
+      doctorId,
+      patientId,
+      caption: 'Treatment Started',
+    });
+    return res.redirect(`/patient-dashboard?status=connected&doctorName=${encodeURIComponent(doctor.fullName)}`);
   } catch (err) {
     console.error(err);
     return res.redirect('/home?status=error');

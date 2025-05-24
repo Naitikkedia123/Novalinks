@@ -23,6 +23,12 @@ const chatSchema = new Schema({
     enum: ['Doctor', 'Patient']
   },
   msg: String,
+  type: {
+    type: String,
+    enum: ['text', 'image'],
+    default: 'text',
+  },
+  caption: String, // For image messages
   status: {
     type: String,
     enum: ['sent', 'delivered', 'read'],
