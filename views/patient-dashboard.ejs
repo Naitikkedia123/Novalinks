@@ -64,6 +64,22 @@
     <% }) %>
   <% } %>
 </div>
+  <section class="card medications">
+  <h3>Prescribed Medications</h3>
+  <% if (medications.length === 0) { %>
+    <p>No medications prescribed yet.</p>
+  <% } else { %>
+    <ul>
+      <% medications.forEach(med => { %>
+        <li>
+          <strong><%= med.name %></strong> – <%= med.dosage %> – <%= med.frequency %> – <%= med.duration %>
+        </li>
+      <% }) %>
+    </ul>
+  <% } %>
+</section>
+
+
       <div class="doctor-actions">
       <a href="/<%=currentUser._id%>/privatechat/<%=doctor._id%>?role=Patient" class="button primary">Chat</a>
             <a href="/end-treatment" class="button danger" onclick="return confirmEndTreatment()">End Treatment</a>
@@ -213,6 +229,5 @@ function scanFromImage() {
     window.history.replaceState({}, document.title, url.pathname);
   }
 </script>
-
 </body>
 </html>

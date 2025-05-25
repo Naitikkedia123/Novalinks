@@ -16,11 +16,11 @@ const Patient = require('./models/patient');
 const Chat = require('./models/chat');
 const Timeline = require("./models/timeline");
 const { isLoggedIn, isDoctor, isPatient } = require('./middleware');
-
+const Report = require('./models/report'); // Assuming you have a Report model
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
-
+const medication = require('./models/medication'); // Assuming you have a Medication model
 const qrDir = path.join(__dirname, 'public', 'qrcodes');
 if (!fs.existsSync(qrDir)) {
   fs.mkdirSync(qrDir, { recursive: true });
@@ -30,6 +30,7 @@ const onlineUsers = new Map();
 const multer = require('multer');
 const { cloudinary, storage } = require('./utils/cloudinary');
 const { constants } = require('buffer');
+const doctor = require('./models/doctor');
 const upload = multer({ storage });
 const router = express.Router();
 
@@ -166,9 +167,6 @@ app.post('/upload-image', upload.single('image'), async (req, res) => {
   }
 });
 
-
-
-
 app.get('/doctor', (req, res) => {
   res.render('doctorregister', { currentUser: req.user });
 });
@@ -176,6 +174,28 @@ app.get('/doctor', (req, res) => {
 app.get('/patient', (req, res) => {
   res.render('patientregister', { currentUser: req.user });
 });
+
+app.post('/prescribe-medication', async (req, res) => {
+  const { patientId } = req.body;
+  const medications = Object.values(req.body.medications); // array of meds
+  const doctorId = req.user._id; // assuming user is authenticated doctor
+
+  try {
+    for (let med of medications) {
+      await medication.create({
+        ...med,
+        patient: patientId,
+        doctor: doctorId
+      });
+    }
+
+    res.redirect(`/docpatient/${patientId}`); // redirect to patient profile
+  } catch (err) {
+    console.error(err);
+    res.status(500).send('Error saving prescriptions.');
+  }
+});
+
 
 app.post('/docregister', async (req, res) => {
   const { fullName, phoneNumber, email, licenseId, clinicLocation, password } = req.body;
@@ -351,7 +371,6 @@ app.get('/patient-dashboard', isPatient, async (req, res) => {
 
   let doctor = null;
   let appointments = [];
-
   if (doctorid) {
     doctor = await Doctor.findById(doctorid).lean();
 
@@ -369,13 +388,14 @@ app.get('/patient-dashboard', isPatient, async (req, res) => {
   .populate('from', 'fullName role')   // Populate `from` with only fullName
   .populate('to', 'fullName role')     // Populate `to` with only fullName
   .sort({ createdAt: 1 });
-
+  const medications = await medication.find({ patient: req.user._id, doctor: doctorid }).populate('doctor', 'fullName');
   res.render('patient-Dashboard', {
     currentUser: req.user,
     error,
     doctor,
     appointments,
     timeline,
+    medications
   });
 });
 
@@ -398,12 +418,13 @@ app.get('/docpatient/:id', isDoctor, async (req, res) => {
   .populate('from', 'fullName role')   // Populate `from` with only fullName
   .populate('to', 'fullName role')     // Populate `to` with only fullName
   .sort({ createdAt: 1 });
-
+    const medications = await medication.find({ patient: patient._id, doctor:req.user._id}).populate('doctor', 'fullName');
     res.render('docpatient', {
       currentUser: req.user,
       patient,
       appointments,
       timeline,
+      medications
     });
   } catch (err) {
     console.error(err);
@@ -447,7 +468,16 @@ app.post('/logout', (req, res, next) => {
     res.redirect('/home?status=loggedout');
   });
 });
-
+app.post('/delete-medication/:id', async (req, res) => {
+  try {
+    const Medication = await medication.findById(req.params.id);
+    await medication.findByIdAndDelete(req.params.id);
+    res.redirect(`/docpatient/${Medication.patient}`);
+  } catch (err) {
+    console.error('Error deleting medication:', err);
+    res.status(500).send('Failed to delete medication.');
+  }
+});
 app.get('/home', (req, res) => {
   res.render('home', {
     currentUser: req.user,

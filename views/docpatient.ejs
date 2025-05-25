@@ -62,10 +62,31 @@
 
       <div class="doctor-actions">
       <a href="/<%=currentUser._id%>/privatechat/<%=patient._id%>?role=Patient" class="button primary">Chat</a>
+      <a href="javascript:void(0)" class="button primary" onclick="openPrescriptionForm()">Prescribe Medication</a>
       <a href="/end-treatment" class="button danger" onclick="return confirmEndTreatment()">End Treatment</a>
 
     </div>
     </section>
+    <section class="card medications">
+  <h2>Prescribed Medications</h2>
+  <% if (medications.length === 0) { %>
+    <p>No medications prescribed yet.</p>
+  <% } else { %>
+    <ul>
+      <% medications.forEach(med => { %>
+        <li>
+          <form method="POST" action="/delete-medication/<%= med._id %>" class="delete-medication-form">
+            <button type="submit" class="delete-btn" title="Remove Medication">
+              <i class="fas fa-times"></i>
+            </button>
+          </form>
+          <strong><%= med.name %></strong> – <%= med.dosage %> – <%= med.frequency %> – <%= med.duration %>
+        </li>
+      <% }) %>
+    </ul>
+  <% } %>
+</section>
+
          <section>
       <div class="timeline-container">
         <h2>Progress Timeline</h2>
@@ -98,6 +119,29 @@
   <% }) %>
 </div>
     </section>
+    <div id="prescriptionModal" class="modal-overlay" style="display: none;">
+  <div class="modal-content">
+    <span class="close-btn" onclick="closePrescriptionForm()">&times;</span>
+    <h2>Prescribe Medication</h2>
+    <form id="prescriptionForm" method="POST" action="/prescribe-medication">
+      <input type="hidden" name="patientId" value="<%= patient._id %>" />
+
+      <div id="medicationsContainer">
+        <div class="medication-entry">
+      <span class="remove-icon" onclick="this.parentElement.remove()">&times;</span>
+      <input type="text" name="medications[0][name]" placeholder="Medicine Name" required />
+      <input type="text" name="medications[0][dosage]" placeholder="Dosage" required />
+      <input type="text" name="medications[0][frequency]" placeholder="Frequency (e.g., twice a day)" required />
+      <input type="text" name="medications[0][duration]" placeholder="Duration (e.g., 5 days)" required />
+    </div>
+
+      </div>
+      <button type="button" class="button" onclick="addMedicationField()">Add More</button>
+      <button type="submit" class="button primary">Submit</button>
+    </form>
+  </div>
+</div>
+
 </main>
 <script>
   function confirmEndTreatment() {
@@ -160,6 +204,35 @@
     url.searchParams.delete('error');
     window.history.replaceState({}, document.title, url.pathname);
   }
+</script>
+<script>
+  function openPrescriptionForm() {
+    document.getElementById("prescriptionModal").style.display = "flex";
+    document.body.style.overflow = "hidden";
+  }
+
+  function closePrescriptionForm() {
+    document.getElementById("prescriptionModal").style.display = "none";
+    document.body.style.overflow = "";
+  }
+
+  let medIndex = 1;
+
+function addMedicationField() {
+  const container = document.getElementById("medicationsContainer");
+  const entry = document.createElement("div");
+  entry.className = "medication-entry";
+  entry.innerHTML = `
+    <span class="remove-icon" onclick="this.parentElement.remove()">&times;</span>
+    <input type="text" name="medications[${medIndex}][name]" placeholder="Medicine Name" required />
+    <input type="text" name="medications[${medIndex}][dosage]" placeholder="Dosage" required />
+    <input type="text" name="medications[${medIndex}][frequency]" placeholder="Frequency" required />
+    <input type="text" name="medications[${medIndex}][duration]" placeholder="Duration" required />
+  `;
+  container.appendChild(entry);
+  medIndex++;
+}
+
 </script>
 
 </body>
