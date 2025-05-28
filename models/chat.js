@@ -22,20 +22,19 @@ const chatSchema = new Schema({
     required: true,
     enum: ['Doctor', 'Patient']
   },
-  msg: String,
+  msg: String, // Optional for text
   type: {
     type: String,
     enum: ['text', 'image'],
     default: 'text',
   },
-  caption: String, // For image messages
+  caption: String, // Optional caption for image
+  mediaUrl: String, // ✅ New field to store image/video/file URL
   status: {
     type: String,
     enum: ['sent', 'delivered', 'read'],
     default: 'sent'
   }
-}, { timestamps: true });
- // <-- This adds createdAt and updatedAt
-  
+}, { timestamps: true }); // Adds createdAt and updatedAt
 
 module.exports = mongoose.model('Chat', chatSchema);
